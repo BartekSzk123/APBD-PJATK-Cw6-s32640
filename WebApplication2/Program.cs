@@ -1,3 +1,5 @@
+using WebApplication2.Service;
+
 namespace WebApplication2;
 
 public class Program
@@ -7,9 +9,10 @@ public class Program
         var builder = WebApplication.CreateBuilder(args);
         
         builder.Services.AddAuthorization();
+        builder.Services.AddControllers();
         
         builder.Services.AddOpenApi();
-
+        builder.Services.AddScoped<IAppointmentService, AppoinmentService>();
         var app = builder.Build();
         
         if (app.Environment.IsDevelopment())
@@ -21,6 +24,8 @@ public class Program
         app.UseHttpsRedirection();
 
         app.UseAuthorization();
+
+        app.MapControllers(); 
         
         app.Run();
     }
