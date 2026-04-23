@@ -1,0 +1,47 @@
+# Build outputs
+bin/
+obj/
+
+# Rider IDE
+.idea/
+
+# User-specific files
+*.user
+*.suo
+*.userprefs
+
+# Visual Studio
+.vs/
+
+# NuGet
+*.nupkg
+*.snupkg
+packages/
+!packages/build/
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Environment-specific appsettings (keep default ones visible)
+appsettings.*.json
+!appsettings.json
+!appsettings.Development.json
+
+# Secrets
+secrets.json
+*.pfx
+*.p12
+
+# Test results
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
