@@ -6,4 +6,5 @@ public interface IAppointmentService
 {
     Task<IEnumerable<AppointmentListDto>> GetAll(string? status = null, string? patientLastName = null);
     Task<AppointmentDetailsDto> GetById(int id);
+    Task<int> CreateAppointment(CreateAppointmentDto createAppointmentDto);
 }

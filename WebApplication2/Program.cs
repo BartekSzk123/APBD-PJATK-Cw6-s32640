@@ -12,7 +12,7 @@ public class Program
         builder.Services.AddControllers();
         
         builder.Services.AddOpenApi();
-        builder.Services.AddScoped<IAppointmentService, AppoinmentService>();
+        builder.Services.AddScoped<IAppointmentService, AppointmentService>();
         var app = builder.Build();
         
         if (app.Environment.IsDevelopment())

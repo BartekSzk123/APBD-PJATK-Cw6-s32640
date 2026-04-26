@@ -23,11 +23,35 @@ public class AppointmentsController(IAppointmentService appointmentService) : Co
         {
             return Ok(await appointmentService.GetById(id));
         }
-        catch (AppointmentNotFound e)
+        catch (NotFound e)
         {
             return NotFound(e.Message);
         }
+    }
 
-        
+    [HttpPost]
+    public async Task<IActionResult> CreateAppointment([FromBody] CreateAppointmentDto createAppointmentDto)
+    {
+        try
+        {
+            var newId = await appointmentService.CreateAppointment(createAppointmentDto);
+            return CreatedAtAction(nameof(GetById), new { id = newId }, createAppointmentDto);
+        }
+        catch (NotFound e)
+        {
+            return NotFound(e.Message);
+        }
+        catch (AppointmentConflict e)
+        {
+            return Conflict(e.Message);
+        }
+        catch (NotActive e)
+        {
+            return BadRequest(e.Message);
+        }
+        catch (WrongDate e)
+        {
+            return BadRequest(e.Message);
+        }
     }
 }

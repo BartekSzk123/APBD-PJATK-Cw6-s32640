@@ -4,9 +4,9 @@ using WebApplication2.Exceptions;
 
 namespace WebApplication2.Service;
 
-public class AppoinmentService(IConfiguration configuration) : IAppointmentService
+public class AppointmentService(IConfiguration configuration) : IAppointmentService
 {
-    public async Task<IEnumerable<AppointmentListDto>> GetAll(string? status = null,  string? patientLastName = null)
+    public async Task<IEnumerable<AppointmentListDto>> GetAll(string? status = null, string? patientLastName = null)
     {
         List<AppointmentListDto> result = [];
 
@@ -27,10 +27,10 @@ public class AppoinmentService(IConfiguration configuration) : IAppointmentServi
                                 AND (@PatientLastName IS NULL OR p.LastName = @PatientLastName)
                               ORDER BY a.AppointmentDate;
                               """;
-        
+
         command.Parameters.AddWithValue(@"Status", (object?)status ?? DBNull.Value);
         command.Parameters.AddWithValue(@"PatientLastName", (object?)patientLastName ?? DBNull.Value);
-        
+
         await connection.OpenAsync();
         var reader = await command.ExecuteReaderAsync();
         while (await reader.ReadAsync())
@@ -45,13 +45,14 @@ public class AppoinmentService(IConfiguration configuration) : IAppointmentServi
                 PatientEmail = reader.GetString(5),
             });
         }
+
         return result;
     }
 
     public async Task<AppointmentDetailsDto> GetById(int id)
     {
         AppointmentDetailsDto result = null;
-        
+
         await using var connection = new SqlConnection(configuration.GetConnectionString("Default"));
         await using var command = new SqlCommand();
         command.Connection = connection;
@@ -94,8 +95,88 @@ public class AppoinmentService(IConfiguration configuration) : IAppointmentServi
 
         if (result is null)
         {
-            throw new AppointmentNotFound($"Appointment with id: {id} not found");
+            throw new NotFound($"Appointment with id: {id} not found");
         }
+
         return result;
+    }
+
+    public async Task<int> CreateAppointment(CreateAppointmentDto createAppointmentDto)
+    {
+        await using var connection = new SqlConnection(configuration.GetConnectionString("Default"));
+        await using var command = new SqlCommand();
+        command.Connection = connection;
+        await connection.OpenAsync();
+
+        command.CommandText = """
+                                SELECT IsActive 
+                                FROM dbo.Patients 
+                                WHERE IdPatient = @IdPatient;
+                              """;
+
+        command.Parameters.AddWithValue(@"IdPatient", createAppointmentDto.IdPatient);
+        var result = await command.ExecuteScalarAsync();
+
+        if (result is null)
+        {
+            throw new NotFound($"Patient with id {createAppointmentDto.IdPatient} not found");
+        }
+
+        if (!(bool)result)
+        {
+            throw new NotActive($"Patient with id {createAppointmentDto.IdPatient} is not active");
+        }
+
+        command.CommandText = """
+                                SELECT IsActive 
+                                FROM dbo.Doctors
+                                WHERE IdDoctor = @IdDoctor;
+                              """;
+
+        command.Parameters.AddWithValue(@"IdDoctor", createAppointmentDto.IdDoctor);
+        result = await command.ExecuteScalarAsync();
+
+        if (result is null)
+        {
+            throw new NotFound($"Doctor with id {createAppointmentDto.IdDoctor} not found");
+        }
+
+        if (!(bool)result)
+        {
+            throw new NotActive($"Doctor with id {createAppointmentDto.IdDoctor} is not active");
+        }
+
+        if (createAppointmentDto.Date <= DateTime.Now)
+        {
+            throw new WrongDate($"Date cannot be  in the past");
+        }
+
+        command.CommandText = """
+                                SELECT COUNT(1)
+                                FROM dbo.Appointments
+                                WHERE IdDoctor = @IdDoctor
+                                AND AppointmentDate = @AppointmentDate;
+                              """;
+
+        command.Parameters.AddWithValue(@"AppointmentDate", createAppointmentDto.Date);
+
+        var count = (int)await command.ExecuteScalarAsync();
+
+        if (count > 0)
+        {
+            throw new AppointmentConflict("Busy doctor");
+        }
+
+        command.CommandText = """
+                                INSERT INTO dbo.Appointments (IdPatient, IdDoctor, AppointmentDate,Status,Reason)
+                                OUTPUT INSERTED.IdAppointment
+                                VALUES (@IdPatient, @IdDoctor, @AppointmentDate, N'Scheduled', @Reason);
+                              """;
+        
+        command.Parameters.AddWithValue(@"Reason", createAppointmentDto.Reason);
+
+        var newId = (int)await command.ExecuteScalarAsync();
+        
+        return newId;
     }
 }
