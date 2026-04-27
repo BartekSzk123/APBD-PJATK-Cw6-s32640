@@ -88,4 +88,21 @@ public class AppointmentsController(IAppointmentService appointmentService) : Co
             return Conflict(e.Message);
         }
     }
+
+    [HttpDelete("{id:int}")]
+    public async Task<IActionResult> DeleteAppointment(int id)
+    {
+        try
+        {
+            var result = await appointmentService.DeleteAppointment(id);
+            return NoContent();
+        }catch(NotFound e)
+        {
+            return NotFound(e.Message);
+        }catch(AppointmentConflict e)
+        {
+            return Conflict(e.Message);
+        }
+    }
+    
 }

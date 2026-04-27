@@ -8,4 +8,5 @@ public interface IAppointmentService
     Task<AppointmentDetailsDto> GetById(int id);
     Task<int> CreateAppointment(CreateAppointmentDto createAppointmentDto);
     Task<int> UpdateAppointment(UpdateAppointmentDto updateAppointmentDto, int id);
+    Task<int> DeleteAppointment(int id);
 }

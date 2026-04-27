@@ -302,4 +302,40 @@ public class AppointmentService(IConfiguration configuration) : IAppointmentServ
         var rowsAffected = await command.ExecuteNonQueryAsync();
         return rowsAffected;
     }
+
+    public async Task<int> DeleteAppointment(int id)
+    {
+        await using var connection = new SqlConnection(configuration.GetConnectionString("Default"));
+        await using var command = new SqlCommand();
+        command.Connection = connection;
+        await connection.OpenAsync();
+
+        command.CommandText = """
+                               SELECT status
+                               FROM dbo.Appointments
+                               Where IdAppointment = @IdAppointment;
+                              """;
+        command.Parameters.AddWithValue(@"IdAppointment", id);
+        var result = await command.ExecuteScalarAsync();
+
+        if (result is null)
+        {
+            throw new NotFound($"Appointment with id: {id} not found");
+        }
+        
+        var status = Convert.ToString(result);
+
+        if (status is "Completed")
+        {
+            throw new AppointmentConflict("Cannot delete completed appointment");
+        }
+        
+        command.CommandText = """
+                                DELETE FROM Appointments
+                                WHERE IdAppointment = @IdAppointment;
+                              """;
+       
+        var rowsAffected = await command.ExecuteNonQueryAsync();
+        return rowsAffected;
+    }
 }
