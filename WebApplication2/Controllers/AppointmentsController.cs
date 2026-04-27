@@ -54,4 +54,38 @@ public class AppointmentsController(IAppointmentService appointmentService) : Co
             return BadRequest(e.Message);
         }
     }
+
+    [HttpPut("{id:int}")]
+    public async Task<IActionResult> UpdateAppointment(int id, [FromBody] UpdateAppointmentDto updateAppointmentDto)
+    {
+        try
+        {
+            var result = await appointmentService.UpdateAppointment(updateAppointmentDto, id);
+            return NoContent();
+        }
+        catch (NotFound e)
+        {
+            return NotFound(e.Message);
+        }
+        catch (AppointmentConflict e)
+        {
+            return Conflict(e.Message);
+        }
+        catch (NotActive e)
+        {
+            return BadRequest(e.Message);
+        }
+        catch (WrongDate e)
+        {
+            return BadRequest(e.Message);
+        }
+        catch(WrongStatus e)
+        {
+            return BadRequest(e.Message);
+        }
+        catch(CannotModifyCompletedDate e)
+        {
+            return Conflict(e.Message);
+        }
+    }
 }

@@ -160,9 +160,10 @@ public class AppointmentService(IConfiguration configuration) : IAppointmentServ
 
         command.Parameters.AddWithValue(@"AppointmentDate", createAppointmentDto.Date);
 
-        var count = (int)await command.ExecuteScalarAsync();
+        var count = await command.ExecuteScalarAsync();
+        var count2 = Convert.ToInt32(count);
 
-        if (count > 0)
+        if (count2 > 0)
         {
             throw new AppointmentConflict("Busy doctor");
         }
@@ -175,8 +176,130 @@ public class AppointmentService(IConfiguration configuration) : IAppointmentServ
         
         command.Parameters.AddWithValue(@"Reason", createAppointmentDto.Reason);
 
-        var newId = (int)await command.ExecuteScalarAsync();
+        var newId = await command.ExecuteScalarAsync();
+        var insertedId =  Convert.ToInt32(newId);
         
-        return newId;
+        return insertedId;
+    }
+
+    public async Task<int> UpdateAppointment(UpdateAppointmentDto updateAppointmentDto, int id)
+    {
+        await using var connection = new SqlConnection(configuration.GetConnectionString("Default"));
+        await using var command = new SqlCommand();
+        command.Connection = connection;
+        await connection.OpenAsync();
+
+        command.CommandText = """
+                                SELECT status
+                                FROM dbo.Appointments
+                                WHERE IdAppointment = @IdAppointment;
+                              """;
+        command.Parameters.AddWithValue(@"IdAppointment", id);
+
+        var result = await command.ExecuteScalarAsync();
+        
+        if (result is null)
+        {
+            throw new NotFound($"Appointment with id: {id} not found");
+        }
+        
+        var status = Convert.ToString(result);
+
+        if (status is "Completed")
+        {
+            throw new CannotModifyCompletedDate($"Appointment id: {id} is completed! cannot modify date");
+        }
+        
+        
+        command.CommandText = """
+                                SELECT IsActive 
+                                FROM dbo.Patients 
+                                WHERE IdPatient = @IdPatient;
+                              """;
+
+        command.Parameters.AddWithValue(@"IdPatient", updateAppointmentDto.IdPatient);
+        var patient = await command.ExecuteScalarAsync();
+
+        if (patient is null)
+        {
+            throw new NotFound($"Patient with id {updateAppointmentDto.IdPatient} not found");
+        }
+
+        if (!(bool)patient)
+        {
+            throw new NotActive($"Patient with id {updateAppointmentDto.IdPatient} is not active");
+        }
+        
+        command.CommandText = """
+                                SELECT IsActive 
+                                FROM dbo.Doctors
+                                WHERE IdDoctor = @IdDoctor;
+                              """;
+
+        command.Parameters.AddWithValue(@"IdDoctor", updateAppointmentDto.IdDoctor);
+        var doctor = await command.ExecuteScalarAsync();
+
+        if (doctor is null)
+        {
+            throw new NotFound($"Doctor with id {updateAppointmentDto.IdDoctor} not found");
+        }
+
+        if (!(bool)doctor)
+        {
+            throw new NotActive($"Doctor with id {updateAppointmentDto.IdDoctor} is not active");
+        }
+
+        if (updateAppointmentDto.Date <= DateTime.Now)
+        {
+            throw new WrongDate($"Date cannot be  in the past");
+        }
+
+        var allowedStatuses = new[] { "Scheduled", "Completed", "Cancelled" };
+
+        if (!allowedStatuses.Contains(updateAppointmentDto.Status))
+        {
+            throw new WrongStatus($"Status {updateAppointmentDto.Status} is not allowed");
+        }
+        
+        command.CommandText = """
+                                SELECT COUNT(1)
+                                FROM dbo.Appointments
+                                WHERE IdDoctor = @IdDoctor
+                                AND AppointmentDate = @AppointmentDate
+                                AND IdAppointment <> @IdAppointment;
+                              """;
+
+        command.Parameters.AddWithValue(@"AppointmentDate", updateAppointmentDto.Date);
+
+        var count = await command.ExecuteScalarAsync();
+        var count2 = Convert.ToInt32(count);
+
+        if (count2 > 0)
+        {
+            throw new AppointmentConflict("Busy doctor");
+        }
+        
+        command.Parameters.Clear();
+        
+        command.CommandText = """
+                                UPDATE Appointments
+                                SET IdPatient = @IdPatient,
+                                    IdDoctor = @IdDoctor,
+                                    AppointmentDate = @AppointmentDate,
+                                    Status = @Status,
+                                    Reason = @Reason,
+                                    InternalNotes = @InternalNotes
+                                WHERE IdAppointment = @Id;
+                              """;
+        command.Parameters.AddWithValue("@Id", id);
+        command.Parameters.AddWithValue("@IdPatient", updateAppointmentDto.IdPatient);
+        command.Parameters.AddWithValue("@IdDoctor", updateAppointmentDto.IdDoctor);
+        command.Parameters.AddWithValue("@AppointmentDate", updateAppointmentDto.Date);
+        command.Parameters.AddWithValue("@Status", updateAppointmentDto.Status);
+        command.Parameters.AddWithValue("@Reason", updateAppointmentDto.Reason);
+        command.Parameters.AddWithValue("@InternalNotes", updateAppointmentDto.InternalNotes);
+        
+        var rowsAffected = await command.ExecuteNonQueryAsync();
+        return rowsAffected;
     }
 }
